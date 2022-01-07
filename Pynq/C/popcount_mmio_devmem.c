@@ -92,7 +92,8 @@ int main(int argc, char **argv)
 	int input_fd;
 	uint8_t *data_buf, *data_ptr;
 	ssize_t buf_cnt;
-        
+    int final_count;
+
 	// Open the input file
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s input_filename\n", argv[0]);
@@ -153,14 +154,12 @@ int main(int argc, char **argv)
 	}
 
 	// Read the bit count result
-	printf("Counted %u ones\n", *count_reg); 
-
+	printf("Counted %u ones\n", *count_reg);
+    final_count = *count_reg;
 	// Release the mapping
 	release_mapped_phys_mem_ptr(popcount_base, 8);
 	
 	free(data_buf);
 	close(input_fd);
-
-	return *count_reg;
+	return final_count;
 }
-
