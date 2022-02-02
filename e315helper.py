@@ -31,7 +31,7 @@ class Helper():
                 return json.load(f)
         else:
             return {"IP": "192.168.2.99", 
-                    "Proj": "P4_Popcount", 
+                    "Proj": "P4_Popcount_C", 
                     "fpga_design": "bd_fpga"}
 
     def save_json(self):
@@ -104,12 +104,12 @@ class Helper():
                     ssh + ' "cd ~/tmp && git init --bare" ',
                     'git remote remove tmp', 
                     'git remote add tmp xilinx@' + self.J['IP'] + ':~/tmp/',
-                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push tmp master', 
+                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push tmp main', 
                     ssh + ' "git clone tmp ~/jupyter_notebooks/' + proj + ' "',
                     ssh + ' "rm -rf ~/tmp" ',
                     'git remote remove pynq', 
                     'git remote add pynq xilinx@' + self.J['IP'] + ':~/jupyter_notebooks/' + proj,
-                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push pynq master', 
+                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push pynq main', 
                    ]   
         for command in commands:                     
             self.run_command(command)

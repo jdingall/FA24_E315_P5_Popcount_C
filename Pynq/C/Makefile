@@ -1,9 +1,16 @@
-popcount_mmio_devmem: popcount_mmio_devmem.c
-	gcc -O0 -g -o popcount_mmio_devmem popcount_mmio_devmem.c 
 
-.PHONY:gdb
-gdb: 
-	sudo gdb --args ./popcount_mmio_devmem small.bin
-.PHONY:clean
-clean:
-	rm -rf a.out popcount_mmio_devmem
+CC		:=gcc
+DBG_FLAGS	:= -g -O0 -Wall
+OPT_FLAGS	:= -O3 -DNODEBUG
+
+all:  software user_mmio
+
+software:  software.c
+	$(CC) $(OPT_FLAGS) -o software software.c
+
+user_mmio: user_mmio.c	
+	$(CC) $(OPT_FLAGS) -o user_mmio user_mmio.c
+
+.PHONY: clean
+clean:  
+	rm -rf software sudo_mmio user_mmio user_dma user_dma.debug 
