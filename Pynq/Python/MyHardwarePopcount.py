@@ -28,5 +28,3 @@ class MyHardwarePopcount():
         f = open(file, "r")
         buf = np.fromfile(f, dtype=np.uint32)
         return self.countArray(buf) 
-
-
