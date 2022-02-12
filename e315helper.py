@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import logging
 import json
 import os
 import shutil
@@ -32,10 +33,12 @@ class Helper():
         else:
             return {"IP": "192.168.2.99", 
                     "Proj": "P4_Popcount_C", 
-                    "fpga_design": "bd_fpga"}
+                    "fpga_design": "bd_fpga",
+                    "branch": "main"}
 
     def save_json(self):
-         with open(self.JF, 'w') as f:
+        logging.debug("saving JSON to " + self.JF)
+        with open(self.JF, 'w') as f:
             json.dump( self.J, f) 
 
      
@@ -46,25 +49,49 @@ class Helper():
         return result.communicate()
 
 
+    def vivado_build_cleanup(self,):
+        vsrc_dir = self.MY_DIR + '/verilog/vsrc/'
+        bd_name = self.J['fpga_design']
+        cleanups = [ bd_name+'.bda', bd_name+'.bxml', bd_name+'_ooc.xml', 
+                     'hdl', 'hw_handoff', 'ip', 'ipshared', 'sim', 'synth' ]
+        cleanups = [ vsrc_dir + bd_name + '/' + x for x in cleanups]
+        for f in cleanups: 
+            try: 
+                shutil.rmtree(f) 
+                logging.debug('cleanup: ' + f)
+            except NotADirectoryError: 
+                os.remove(f)
+                logging.debug('cleanup: ' + f)
+            except FileNotFoundError:
+                logging.debug('skipped: ' + f) 
+
     def build_vivado(self,):
         #sanity check
         if os.path.exists( self.MY_DIR + '/vivado_project/vivado_project.xpr'):
             print ("Found Vivado Project, Skipping.")
             return
 
-        command = 'vivado -mode batch -source ' + self.J['Proj'] + '.tcl'
+        #remove remnents of old builds
+        self.vivado_build_cleanup()
+
+        command = 'vivado -mode batch -source tcl/setup.tcl' 
+        fixup = 'vivado -mode batch -source tcl/fixup.tcl'
 
         if self.vivado != None:
-            print ("vivado specified from command line")
+            logging.debug ("vivado specified from command line")
             command = command.replace('vivado', self.vivado)
-
+            fixup = fixup.replace('vivado', self.vivado)
         elif shutil.which('vivado') != None:
-            print ("Found Vivado")
+            logging.debug ("Found Vivado")
         else:
             raise Exception("Vivado not found!")
 
         print ("Building Vivado Project")
         self.run_command(command) 
+
+        if os.path.exists( self.MY_DIR + '/tcl/fixup.tcl'):
+            logging.debug ("Found extra fixup tcl script, running")
+            self.run_command(fixup)
 
     def impl_vivado(self, num_cores = 1):
         #sanity check
@@ -76,10 +103,10 @@ class Helper():
                 ' -tclargs ' + self.MY_DIR + ' ' + str(num_cores)
 
         if self.vivado != None:
-            print ("vivado specified from command line")
+            logging.debug("vivado specified from command line")
             command = command.replace('vivado', self.vivado)
         elif shutil.which('vivado') != None:
-            print ("Found Vivado")
+            logging.debug("Found Vivado")
         else:
             raise Exception("Vivado not found!")
 
@@ -104,13 +131,13 @@ class Helper():
                     ssh + ' "cd ~/tmp && git init --bare" ',
                     'git remote remove tmp', 
                     'git remote add tmp xilinx@' + self.J['IP'] + ':~/tmp/',
-                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push tmp main', 
+                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push tmp ' + self.J['branch'], 
                     ssh + ' "git clone tmp ~/jupyter_notebooks/' + proj + ' "',
                     ssh + ' "rm -rf ~/tmp" ',
                     'git remote remove pynq', 
                     'git remote add pynq xilinx@' + self.J['IP'] + ':~/jupyter_notebooks/' + proj,
-                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push pynq main', 
-                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git checkout main"'
+                    'GIT_SSH_COMMAND=\'ssh -i '+self.priv_key + '\' git push pynq ' + self.J['branch'], 
+                    ssh + ' "cd ~/jupyter_notebooks/' + proj + ' && git checkout ' + self.J['branch'] + '"'
                    ]   
         for command in commands:                     
             self.run_command(command)
@@ -122,8 +149,8 @@ class Helper():
                             self.J['fpga_design']+'.hwh'
 
         if not os.path.exists( hwh):
-            print ('trying alternate hwh file path')
-            hwh = self.MY_DIR + '/src/vsrc/'+ self.J['fpga_design'] + '/hw_handoff/' + self.J['fpga_design'] + '.hwh'
+            logging.info('trying alternate hwh file path')
+            hwh = self.MY_DIR + '/verilog/vsrc/'+ self.J['fpga_design'] + '/hw_handoff/' + self.J['fpga_design'] + '.hwh'
 
         scp = 'scp -i ' + self.priv_key
         pynq = 'xilinx@'+self.J['IP'] + ':~/jupyter_notebooks/' + self.J['Proj'] + '/Pynq/'
@@ -165,6 +192,7 @@ class Parser():
 
     def __init__ (self):
         ap = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+        ap.add_argument('-d', '--debug', action='store_true', help="Enable Debug Mode")
 
         sap = ap.add_subparsers(title='command', dest="command")
 
@@ -195,7 +223,17 @@ class Parser():
 
         init_ap.set_defaults(function=self.init)
         args = ap.parse_args()
-        
+
+        # load debug mode
+        if args.debug: 
+            logging.basicConfig(format='%(levelname)s:%(message)s',
+                                level=logging.DEBUG, 
+                                handlers = [
+                                    logging.FileHandler('debug.log', mode='w'),
+                                    logging.StreamHandler()
+                                ])
+            logging.debug("Enabling Debug")
+
         if not hasattr(self, args.command):
             print ('Unrecognized Command')
             ap.print_help()
