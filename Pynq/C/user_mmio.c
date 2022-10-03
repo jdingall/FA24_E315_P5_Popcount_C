@@ -42,10 +42,7 @@ int main(int argc, char **argv)
 			MAP_SHARED, user_mem_fd, 0x0); // not 0x40000000
 	if (vaddr_base == MAP_FAILED) { perror("mmap()"); return 1; }
     
-    // define registers
-    uint32_t * reset_reg = (uint32_t*) vaddr_base;
-    uint32_t * count_reg = (uint32_t*) (vaddr_base + 0x4);
-	//
+    //TO DO: define registers
 
     //TO DO: open the input file
 
